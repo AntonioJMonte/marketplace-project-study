@@ -7,6 +7,7 @@ import { AppService } from './app.service.js';
 import { ProxyModule } from './proxy/proxy.module.js';
 import { MiddlewareModule } from './middleware/middleware.module.js';
 import { LoggingMiddleware } from './middleware/logging/logging.middleware.js';
+import { AuthModule } from './auth/auth.module.js';
 
 @Module({
   imports: [
@@ -14,15 +15,28 @@ import { LoggingMiddleware } from './middleware/logging/logging.middleware.js';
       isGlobal: true
     }),
     ThrottlerModule.forRoot({
-      throttlers: [
+      throttlers: [ 
+        // Each route can have a type of rate limit
         {
-          ttl: 60_000,
-          limit: 100,
+          name: 'short',
+          ttl: 1000, // 1 sec
+          limit: 10, // 10 request per sec
+        },
+        {
+          name: 'medium',
+          ttl: 60000, // 1 minute
+          limit: 100, // 100 request per minute
+        },
+        {
+          name: 'long',
+          ttl: 900000, //15 minutes
+          limit: 1000, // 100 request per minute
         },
       ],
     }),
     ProxyModule,
     MiddlewareModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [
