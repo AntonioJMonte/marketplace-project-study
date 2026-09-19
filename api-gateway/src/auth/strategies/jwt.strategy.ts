@@ -1,7 +1,7 @@
 import { Injectable, PayloadTooLargeException, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { AuthService } from '../service/auth.service.js';
+import { AuthService } from '../services/auth.service.js';
 
 @Injectable()
 
