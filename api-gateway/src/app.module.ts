@@ -1,13 +1,14 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ProxyModule } from './proxy/proxy.module.js';
 import { MiddlewareModule } from './middleware/middleware.module.js';
 import { LoggingMiddleware } from './middleware/logging/logging.middleware.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CustomThrottlerGuard } from './guards/throttler.guard.js';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { AuthModule } from './auth/auth.module.js';
           limit: configService.get<number>('RATE_LIMIT_LONG', 1000),
         },
       ],
-      inject: [ConfigModule],
+      inject: [ConfigService],
     }),
     ProxyModule,
     MiddlewareModule,
@@ -44,8 +45,9 @@ import { AuthModule } from './auth/auth.module.js';
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: CustomThrottlerGuard, // global rate limit
     },
+
   ],
 })
 export class AppModule implements NestModule {

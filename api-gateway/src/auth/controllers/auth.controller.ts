@@ -1,6 +1,9 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service.js';
+import { Throttle } from '@nestjs/throttler';
+import { LoginDto } from '../dtos/login.dto.js';
+import { RegisterDto } from '../dtos/register.dto.js';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -9,12 +12,14 @@ export class AuthController {
 
 
     // ApiOperation e ApiResponse é para swagger
+    // dto is a data transfer object, prevents the exposure of data
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'User Login' })
     @ApiResponse({ status: 200, description: 'Login successful' })
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
-    async login(@Body() loginDto: { email: string; password: string }) {
+    @Throttle({ short: { limit:5, ttl: 60000 } })
+    async login(@Body() loginDto: LoginDto) {
         return this.authService.login(loginDto)
     }
 
@@ -23,7 +28,8 @@ export class AuthController {
     @ApiOperation({ summary: 'User registration' })
     @ApiResponse({ status: 201, description: 'Registration successful' })
     @ApiResponse({ status: 400, description: 'Invalid registration data' })
-    async register(@Body() registerDto: any) {
+    @Throttle({ medium: { limit:3, ttl: 60000 } })
+    async register(@Body() registerDto: RegisterDto) {
         return this.authService.register(registerDto)
     }
 }

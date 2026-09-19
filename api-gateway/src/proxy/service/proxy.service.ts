@@ -9,10 +9,9 @@ export class ProxyService {
 
     constructor(private readonly httpService: HttpService) {}
 
-    // Keyof está criando uma união de tipos, 
-    // que nesse caso é o nome dos serviços que estão no serviceConfig, ou seja, 'users' | 'products' | 'checkout' | 'payments'
-    // proxyRequest vai interceptar a requisição e realizar a validação (verifica segurança, headers, auth, métodos e etc) e 
-    // depois, se a requisição for válida, redireciona para o servidor 
+    // keyof is creating a union of types
+    // wich in this case are the name of the services in serviceConfig, that is, 'users' | 'products' | 'checkout' | 'payments'
+    // proxyRequest will intercept the req (wich has already passed through the validation middleware) and will forward the body, handle timeout, capture logs and etc
     async proxyRequest(
         serviceName: keyof typeof serviceConfig, // tipo de serviço utilizado para fazer a requisição
         method: string, 
