@@ -1,4 +1,5 @@
 import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
+import { Request, Response } from 'express';
 
 // Intercep all requests and returns a log of each intercepted route
 // The log will contain informations such as method, duration, url, ip, length, status code 
@@ -8,7 +9,7 @@ export class LoggingMiddleware implements NestMiddleware {
 
   private readonly logger = new Logger('HTTP');
   
-  use(req: any, res: any, next: () => void) {
+  use(req: Request, res: Response, next: () => void) {
     const { method, originalUrl, ip } = req;
     const userAgent = req.get('User-Agent') || '';
     const startTime = Date.now();
@@ -33,7 +34,7 @@ export class LoggingMiddleware implements NestMiddleware {
     })
 
     // error log
-    res.on('error', (error: { message: any; }) => {
+    res.on('error', (error) => {
       this.logger.error(
       `Response Error: ${method} ${originalUrl} - ${error.message}`
       );

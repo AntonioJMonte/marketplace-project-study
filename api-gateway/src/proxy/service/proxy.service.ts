@@ -3,6 +3,14 @@ import { HttpService } from '@nestjs/axios';
 import { serviceConfig } from '../../config/gateway.config.js';
 import { firstValueFrom } from 'rxjs';
 
+interface UserInfo { 
+    userId: string;
+    email: string;
+    role: string;
+}
+
+type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
 @Injectable()
 export class ProxyService {
     private readonly logger = new Logger(ProxyService.name);
@@ -16,9 +24,9 @@ export class ProxyService {
         serviceName: keyof typeof serviceConfig, // tipo de serviço utilizado para fazer a requisição
         method: string, 
         path: string, // é a rota que vamos bater
-        data?: any, // body da requisição
-        headers?: any, // cabeçalho da requisição
-        userInfo?: any) {
+        data?: unknown, // body da requisição
+        headers?: Record<string, string>, // cabeçalho da requisição
+        userInfo?: UserInfo) {
 
             const service = serviceConfig[serviceName];
             const url = `${service.url}${path}`;
@@ -37,7 +45,7 @@ export class ProxyService {
                 // cria a request para ser enviada para o servidor
                 const response = await firstValueFrom(
                     this.httpService.request({
-                        method: method.toLowerCase() as any,
+                        method: method.toLowerCase() as HttpMethod,
                         url,
                         data,
                         headers: enhancedHeaders,

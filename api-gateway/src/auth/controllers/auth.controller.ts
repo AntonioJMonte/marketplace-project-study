@@ -15,7 +15,11 @@ export class AuthController {
     // dto is a data transfer object, prevents the exposure of data
     @Post('login')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'User Login' })
+    @ApiOperation({ 
+        summary: 'User Login',
+        description: 'Autentica um usuário e retorna JWT token e session token'
+
+    })
     @ApiResponse({ status: 200, description: 'Login successful' })
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
     @Throttle({ short: { limit:5, ttl: 60000 } })
@@ -25,9 +29,13 @@ export class AuthController {
 
     @Post('register')
     @HttpCode(HttpStatus.CREATED)
-    @ApiOperation({ summary: 'User registration' })
+    @ApiOperation({ 
+        summary: 'User registration',
+        description: 'Cria uma conta nova de usuário no sistema' 
+    })
     @ApiResponse({ status: 201, description: 'Registration successful' })
     @ApiResponse({ status: 400, description: 'Invalid registration data' })
+    @ApiResponse({ status: 409, description: 'Email already registered' })
     @Throttle({ medium: { limit:3, ttl: 60000 } })
     async register(@Body() registerDto: RegisterDto) {
         return this.authService.register(registerDto)
