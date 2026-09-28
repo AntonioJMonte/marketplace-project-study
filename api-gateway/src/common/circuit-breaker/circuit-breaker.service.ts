@@ -13,8 +13,8 @@ export class CircuitBreakerService {
     
     async executeWithCircuitBreaker<T> (
         operation: () => Promise<T>, // is the operation active in the moment
+        key: string, // key is the service being protected
         fallback?: () => Promise<T>,
-        key?: string, // key is the service being protected
         options: CircuitBreakerOptions = this.defaultOptions,
     ): Promise<T> {
         if (key === undefined) throw new Error ('Undefined Key')
