@@ -3,6 +3,9 @@ import { HttpService } from '@nestjs/axios';
 import { serviceConfig } from '../../config/gateway.config.js';
 import { firstValueFrom } from 'rxjs';
 import { CircuitBreakerService } from '../../common/circuit-breaker/circuit-breaker.service.js';
+import { CacheFallBackService } from '../../common/fallback/cache.fallback.js';
+import { DefaultFallBackService } from '../../common/fallback/default.fallback.js';
+import { ListFormat } from 'typescript';
 
 interface UserInfo { 
     userId: string;
@@ -18,7 +21,9 @@ export class ProxyService {
 
     constructor(
         private readonly httpService: HttpService,
-        private readonly circuitBreakerService: CircuitBreakerService
+        private readonly circuitBreakerService: CircuitBreakerService,
+        private readonly cacheFallBackService: CacheFallBackService,
+        private readonly defaultFallBackService: DefaultFallBackService
     ) {}
 
     // keyof is creating a union of types
@@ -37,6 +42,7 @@ export class ProxyService {
 
             this.logger.log(`Proxying request to ${url} with method ${method}`);
 
+            const fallback = this.createServiceFallback(serviceName, method, path);
             
             return this.circuitBreakerService.executeWithCircuitBreaker(
                 async () => {
@@ -58,13 +64,17 @@ export class ProxyService {
                             timeout: service.timeout
                         })
                     );
-                    return response;
+                    if (method.toLocaleLowerCase() === 'get') { 
+                        this.cacheFallBackService.saveSuccessfulResponse(
+                            `${serviceName}-${path}`,
+                            response.data 
+                        )    
+                    }
+                    return response.data;
 
                 },
                 `proxy-${serviceName}`,
-                () => {
-                    throw new Error (`${serviceName} service is temporarily unavailable`)
-                },
+                fallback,
                 { failureThreshold: 3, timeout: 30000, resetTimeout: 30000 }
             )
     } 
@@ -83,4 +93,24 @@ export class ProxyService {
         }
 
     }   
+
+    createServiceFallback (serviceName: string, method: string, path: string) {
+        switch (serviceName) {
+            case 'users':
+                if (path.includes('/auth/login')) {
+                    return this.defaultFallBackService.createErrorFallback('users', 'Authentication service unavailable')
+                }
+                return this.defaultFallBackService.createErrorFallback('users', 'User service unavailable')
+            case 'products':
+                if (method.toLowerCase() === 'get') {
+                    return this.cacheFallBackService.createCacheFallback(`product-${path}`, { products: [], total: 0, page: 1, limit: 10 })
+                }
+                return this.defaultFallBackService.createErrorFallback('products', 'Products service unavailable')
+            case 'checkout':
+            case 'payments':
+                return this.defaultFallBackService.createErrorFallback(serviceName, `${serviceName} service unavailable`)
+            default:
+                return this.defaultFallBackService.createErrorFallback(serviceName, 'Service unavailable')
+        }
+    }
 } 
