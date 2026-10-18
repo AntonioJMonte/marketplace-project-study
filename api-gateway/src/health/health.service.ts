@@ -1,0 +1,68 @@
+import { Injectable } from '@nestjs/common';
+import { HealthCheckService } from '../common/health/health-check.service.js';
+import { HealthStatus } from '../common/health/health-check.interface.js';
+import { timestamp } from 'rxjs';
+
+@Injectable()
+export class HealthService {
+
+    constructor(
+        private readonly healthCheckService: HealthCheckService
+    )
+    {}
+
+    async getHealthStatus () {
+        const healthChecks = await this.healthCheckService.checkAllServices()
+
+        const results = {
+            status: HealthStatus.HEALTHY,
+            timestamp: new Date().toISOString(),
+            gateway: {
+                status: HealthStatus.HEALTHY,
+                uptime: process.uptime(),
+                memory: process.memoryUsage()
+            },
+            services: {} as Record<string, unknown>,
+        }
+
+        let hasUnhealthyServices = false;
+
+        healthChecks.forEach((serviceHealth) => {
+            results.services[serviceHealth.name] = {
+                status: serviceHealth.status,
+                responseTime: serviceHealth.responseTime,
+                lastCheck: serviceHealth.lastChecked,
+                url: serviceHealth.url,
+                ...(serviceHealth.error && { error:serviceHealth.error })
+            }
+
+            if (serviceHealth.status === HealthStatus.UNHEALTHY) {
+                hasUnhealthyServices = true
+            }
+        })
+
+        if (hasUnhealthyServices) {
+            results.status = HealthStatus.DEGRADED
+        }
+        
+        return results
+
+    }
+
+    async getReadyStatus() {
+        const healthStatus = await this.getHealthStatus()
+        return {
+            status: healthStatus.status === HealthStatus.HEALTHY ? 'ready': 'not-ready',
+            timestamp: new Date().toISOString()
+        }
+    }
+
+    async getLiveStatus() {
+        return {
+            status: 'alive',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime()
+        }
+    }
+
+}

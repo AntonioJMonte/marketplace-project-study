@@ -9,6 +9,14 @@ import { MiddlewareModule } from './middleware/middleware.module.js';
 import { LoggingMiddleware } from './middleware/logging/logging.middleware.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CustomThrottlerGuard } from './guards/throttler.guard.js';
+import { HealthModule } from './health/health.module.js';
+import { HealthService } from './health/health.service.js';
+import { HealthController } from './health/health.controller.js';
+import { HealthCheckModule } from './common/health/health-check.module.js';
+import { FallBackModule } from './common/fallback/fallback.module.js';
+import { CircuitBreakerModule } from './common/circuit-breaker/circuit-breaker.module.js';
+import { TimeoutModule } from './common/timeout/timeout.module.js';
+import { RetryModule } from './common/retry/retry.module.js';
 
 @Module({
   imports: [
@@ -39,14 +47,21 @@ import { CustomThrottlerGuard } from './guards/throttler.guard.js';
     ProxyModule,
     MiddlewareModule,
     AuthModule,
+    HealthModule,
+    HealthCheckModule,
+    FallBackModule,
+    CircuitBreakerModule,
+    TimeoutModule,
+    RetryModule
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
       useClass: CustomThrottlerGuard, // global rate limit
     },
+    HealthService,
 
   ],
 })

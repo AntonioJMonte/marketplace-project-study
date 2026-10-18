@@ -5,7 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import { CircuitBreakerService } from '../../common/circuit-breaker/circuit-breaker.service.js';
 import { CacheFallBackService } from '../../common/fallback/cache.fallback.js';
 import { DefaultFallBackService } from '../../common/fallback/default.fallback.js';
-import { ListFormat } from 'typescript';
+import { TimeoutService } from '../../common/timeout/timeout.service.js';
+import { RetryService } from '../../common/retry/retry.service.js';
 
 interface UserInfo { 
     userId: string;
@@ -23,7 +24,9 @@ export class ProxyService {
         private readonly httpService: HttpService,
         private readonly circuitBreakerService: CircuitBreakerService,
         private readonly cacheFallBackService: CacheFallBackService,
-        private readonly defaultFallBackService: DefaultFallBackService
+        private readonly defaultFallBackService: DefaultFallBackService,
+        private readonly timeoutService: TimeoutService,
+        private readonly retryService: RetryService,
     ) {}
 
     // keyof is creating a union of types
@@ -44,34 +47,47 @@ export class ProxyService {
 
             const fallback = this.createServiceFallback(serviceName, method, path);
             
+            // Camada 1: Circuit Breaker
             return this.circuitBreakerService.executeWithCircuitBreaker(
+                // Camada 2: Retry
                 async () => {
-                    // adiciona tudo que vem de header e complementa com as infos do usuário
-                    const enhancedHeaders = { 
-                        ...headers, 
-                        'x-user-id': userInfo?.userId,
-                        'x-user-email': userInfo?.email,
-                        'x-user-role': userInfo?.role,
-                    }
+                    return await this.retryService.executeWithExponentialBackoff(
+                        // Camada 3: Timeout
+                        async () => {
+                            return await this.timeoutService.executeWithCustomTimeout(
+                                async () => {
+                                    // adiciona tudo que vem de header e complementa com as infos do usuário
+                                    const enhancedHeaders = { 
+                                        ...headers, 
+                                        'x-user-id': userInfo?.userId,
+                                        'x-user-email': userInfo?.email,
+                                        'x-user-role': userInfo?.role,
+                                    }
 
-                    // cria a request para ser enviada para o servidor
-                    const response = await firstValueFrom(
-                        this.httpService.request({
-                            method: method.toLowerCase() as HttpMethod,
-                            url,
-                            data,
-                            headers: enhancedHeaders,
-                            timeout: service.timeout
-                        })
-                    );
-                    if (method.toLocaleLowerCase() === 'get') { 
-                        this.cacheFallBackService.saveSuccessfulResponse(
-                            `${serviceName}-${path}`,
-                            response.data 
-                        )    
-                    }
-                    return response.data;
+                                    // cria a request para ser enviada para o servidor
+                                    const response = await firstValueFrom(
+                                        this.httpService.request({
+                                            method: method.toLowerCase() as HttpMethod,
+                                            url,
+                                            data,
+                                            headers: enhancedHeaders,
+                                            timeout: service.timeout
+                                        })
+                                    );
+                                    if (method.toLocaleLowerCase() === 'get') { 
+                                        this.cacheFallBackService.saveSuccessfulResponse(
+                                            `${serviceName}-${path}`,
+                                            response.data 
+                                        )    
+                                    }
+                                    return response.data;
 
+                                },
+                                service.timeout
+                            )
+                        },
+                        3,
+                    )
                 },
                 `proxy-${serviceName}`,
                 fallback,
@@ -79,22 +95,22 @@ export class ProxyService {
             )
     } 
 
-    async getServiceHealth (serviceName: keyof typeof serviceConfig) {
+    // async getServiceHealth (serviceName: keyof typeof serviceConfig) {
 
-        try {
-            const service = serviceConfig[serviceName];
-            const response = await firstValueFrom(
-                this.httpService.get(`${service.url}/health`, { timeout: 3000 })
-            );
-            return { status: 'healthy', data: response.data };
+    //     try {
+    //         const service = serviceConfig[serviceName];
+    //         const response = await firstValueFrom(
+    //             this.httpService.get(`${service.url}/health`, { timeout: 3000 })
+    //         );
+    //         return { status: 'healthy', data: response.data };
 
-        } catch (error: any) {
-            return { status: 'unhealthy', error: error?.message ?? 'Unknown error' }
-        }
+    //     } catch (error: any) {
+    //         return { status: 'unhealthy', error: error?.message ?? 'Unknown error' }
+    //     }
 
-    }   
+    // }   
 
-    createServiceFallback (serviceName: string, method: string, path: string) {
+    private createServiceFallback (serviceName: string, method: string, path: string) {
         switch (serviceName) {
             case 'users':
                 if (path.includes('/auth/login')) {
